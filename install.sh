@@ -25,14 +25,23 @@ detect_platform() {
   echo "${os} ${arch}"
 }
 
-get_latest_tag() {
-  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/'
+curl_retry() {
+  max_retries=3
+  retry=0
+  until [ $retry -ge $max_retries ]; do
+    if curl -fsSL -H "User-Agent: Mozilla/5.0" "$@"; then
+      return 0
+    fi
+    retry=$((retry + 1))
+    echo "Retry $retry/$max_retries in 2s..."
+    sleep 2
+  done
+  return 1
 }
 
 download_binary() {
   platform=$1
   arch=$2
-  tag=$3
   tmpdir=$(mktemp -d)
   cd "$tmpdir"
 
@@ -42,13 +51,39 @@ download_binary() {
     asset_name="aws-billing-info-${arch}-linux"
   fi
 
-  url="https://github.com/${REPO}/releases/download/${tag}/${asset_name}"
+  echo "Downloading ${asset_name}..."
 
-  echo "Downloading ${asset_name} (${tag})..."
-  curl -fsSL "$url" -o "$BIN_NAME"
+  url="https://github.com/${REPO}/releases/latest/download/${asset_name}"
 
-  chmod +x "$BIN_NAME"
-  echo "$tmpdir/$BIN_NAME"
+  if curl_retry -o "$BIN_NAME" "$url"; then
+    echo "Downloaded successfully"
+    chmod +x "$BIN_NAME"
+    echo "$tmpdir/$BIN_NAME"
+    return 0
+  fi
+
+  echo "Direct download failed, trying GitHub API..."
+
+  tag=$(curl_retry "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+
+  if [ -z "$tag" ]; then
+    echo "Failed to determine latest release tag"
+    rm -rf "$tmpdir"
+    exit 1
+  fi
+
+  api_url="https://github.com/${REPO}/releases/download/${tag}/${asset_name}"
+
+  if curl_retry -o "$BIN_NAME" "$api_url"; then
+    echo "Downloaded successfully via API"
+    chmod +x "$BIN_NAME"
+    echo "$tmpdir/$BIN_NAME"
+    return 0
+  fi
+
+  echo "Failed to download binary from both direct and API URLs"
+  rm -rf "$tmpdir"
+  exit 1
 }
 
 install_binary() {
@@ -85,17 +120,10 @@ main() {
 $(detect_platform)
 EOF
 
-  tag=$(get_latest_tag)
-  if [ -z "$tag" ]; then
-    echo "Failed to determine latest release tag"
-    exit 1
-  fi
-
   echo "Platform: $platform ($arch)"
-  echo "Latest release: $tag"
   echo "Install dir: $INSTALL_DIR"
 
-  binary_path=$(download_binary "$platform" "$arch" "$tag")
+  binary_path=$(download_binary "$platform" "$arch")
   install_binary "$binary_path"
   add_to_path
 
