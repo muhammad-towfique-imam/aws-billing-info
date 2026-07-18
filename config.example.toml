@@ -1,0 +1,7 @@
+[thresholds.total]
+green = 2.0
+orange = 4.0
+
+[thresholds.line_items]
+green = 1.0
+orange = 2.0
