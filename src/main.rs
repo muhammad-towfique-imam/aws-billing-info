@@ -26,7 +26,6 @@ struct DailyCost {
 
 #[derive(Debug, Clone)]
 struct BillingData {
-    total: f64,
     days: Vec<DailyCost>,
 }
 
@@ -179,7 +178,6 @@ fn fetch_billing(days: u32) -> Result<BillingData, Error> {
     }
 
     let mut days = Vec::new();
-    let mut total = 0.0;
 
     for (date_str, services) in days_map {
         let date_obj =
@@ -190,20 +188,25 @@ fn fetch_billing(days: u32) -> Result<BillingData, Error> {
             date_obj.format("%B"),
             date_obj.year()
         );
-        let day_total: f64 = services.iter().map(|(_, amt)| *amt).sum();
-        total += day_total;
         days.push(DailyCost {
             formatted_date,
             services,
         });
     }
 
-    Ok(BillingData { total, days })
+    Ok(BillingData { days })
 }
 
-fn print_total(data: &BillingData, thresholds: Thresholds) {
-    let color = color_for_amount(data.total, thresholds.total_green, thresholds.total_orange);
-    println!("Total: {}{:.2}\x1b[0m", color, data.total);
+fn print_daily_totals(data: &BillingData, thresholds: Thresholds) {
+    for (day_idx, day) in data.days.iter().enumerate() {
+        if day_idx > 0 {
+            println!();
+        }
+        println!("\x1b[1;36m{}\x1b[0m", day.formatted_date);
+        let day_total: f64 = day.services.iter().map(|(_, amt)| *amt).sum();
+        let color = color_for_amount(day_total, thresholds.total_green, thresholds.total_orange);
+        println!(" - Total: {}{:.2}\x1b[0m", color, day_total);
+    }
 }
 
 fn print_billing(data: &BillingData, thresholds: Thresholds) {
@@ -240,7 +243,7 @@ fn main() {
             if args.detailed {
                 print_billing(&data, thresholds);
             } else {
-                print_total(&data, thresholds);
+                print_daily_totals(&data, thresholds);
             }
         }
         Err(e) => {

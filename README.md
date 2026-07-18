@@ -34,12 +34,19 @@ aws-billing-info -d 30 --detailed
 
 ## Output
 
-### Default (total only)
+### Default (daily totals)
 
 ```
 Fetching AWS billing data for last 7 days...
 
-Total: $3.06
+12 July 2026
+ - Total: $1.02
+
+13 July 2026
+ - Total: $1.02
+
+14 July 2026
+ - Total: $1.02
 ```
 
 ### Detailed (`--detailed`)
