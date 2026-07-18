@@ -1,5 +1,5 @@
 [package]
-name = "aws-billing-tui"
+name = "aws-billing-info"
 version = "0.1.0"
 edition = "2021"
 description = "Minimal TUI for AWS billing"

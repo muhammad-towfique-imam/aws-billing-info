@@ -1,9 +1,9 @@
 #!/bin/sh
 set -euo pipefail
 
-REPO="muhammad-towfique-imam/aws-billing-tui"
+REPO="muhammad-towfique-imam/aws-billing-info"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
-BIN_NAME="aws-billing-tui"
+BIN_NAME="aws-billing-info"
 
 detect_platform() {
   os=$(uname -s | tr '[:upper:]' '[:lower:]')

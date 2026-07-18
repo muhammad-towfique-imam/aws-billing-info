@@ -17,16 +17,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: aws-billing-tui-x86_64-linux
+            artifact_name: aws-billing-info-x86_64-linux
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: aws-billing-tui-x86_64-macos
+            artifact_name: aws-billing-info-x86_64-macos
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: aws-billing-tui-aarch64-macos
+            artifact_name: aws-billing-info-aarch64-macos
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: aws-billing-tui-x86_64-windows.exe
+            artifact_name: aws-billing-info-x86_64-windows.exe
 
     steps:
       - name: Checkout code
@@ -44,9 +44,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp target/${{ matrix.target }}/release/aws-billing-tui.exe ${{ matrix.artifact_name }}
+            cp target/${{ matrix.target }}/release/aws-billing-info.exe ${{ matrix.artifact_name }}
           else
-            cp target/${{ matrix.target }}/release/aws-billing-tui ${{ matrix.artifact_name }}
+            cp target/${{ matrix.target }}/release/aws-billing-info ${{ matrix.artifact_name }}
           fi
 
       - name: Upload artifact

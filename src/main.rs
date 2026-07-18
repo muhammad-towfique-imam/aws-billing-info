@@ -60,7 +60,7 @@ fn load_thresholds() -> Thresholds {
         PathBuf::from("config.toml"),
         config_dir()
             .unwrap_or_default()
-            .join("aws-billing-tui")
+            .join("aws-billing-info")
             .join("config.toml"),
     ];
 
