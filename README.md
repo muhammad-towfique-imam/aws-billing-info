@@ -13,9 +13,10 @@ A minimal CLI tool that fetches and displays AWS billing data for the last N day
 curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-info/main/install.sh | sh
 ```
 
-Custom install directory:
+## Uninstall
+
 ```bash
-curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-info/main/install.sh | INSTALL_DIR=/usr/local/bin sh
+curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-info/main/uninstall.sh | sh
 ```
 
 ## Usage
