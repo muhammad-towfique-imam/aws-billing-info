@@ -25,21 +25,26 @@ detect_platform() {
   echo "${os} ${arch}"
 }
 
+get_latest_tag() {
+  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/'
+}
+
 download_binary() {
   platform=$1
   arch=$2
+  tag=$3
   tmpdir=$(mktemp -d)
   cd "$tmpdir"
 
   if [ "$platform" = "macos" ]; then
-    asset_name="aws-billing-tui-${arch}-macos"
+    asset_name="aws-billing-info-${arch}-macos"
   else
-    asset_name="aws-billing-tui-${arch}-linux"
+    asset_name="aws-billing-info-${arch}-linux"
   fi
 
-  url="https://github.com/${REPO}/releases/latest/download/${asset_name}"
+  url="https://github.com/${REPO}/releases/download/${tag}/${asset_name}"
 
-  echo "Downloading ${asset_name}..."
+  echo "Downloading ${asset_name} (${tag})..."
   curl -fsSL "$url" -o "$BIN_NAME"
 
   chmod +x "$BIN_NAME"
@@ -80,10 +85,17 @@ main() {
 $(detect_platform)
 EOF
 
+  tag=$(get_latest_tag)
+  if [ -z "$tag" ]; then
+    echo "Failed to determine latest release tag"
+    exit 1
+  fi
+
   echo "Platform: $platform ($arch)"
+  echo "Latest release: $tag"
   echo "Install dir: $INSTALL_DIR"
 
-  binary_path=$(download_binary "$platform" "$arch")
+  binary_path=$(download_binary "$platform" "$arch" "$tag")
   install_binary "$binary_path"
   add_to_path
 
