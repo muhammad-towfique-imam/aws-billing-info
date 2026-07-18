@@ -21,15 +21,28 @@ curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-
 ## Usage
 
 ```bash
-# Default: last 7 days
+# Default: show only total
 aws-billing-info
 
-# Custom days
-aws-billing-info --days 14
-aws-billing-info -d 30
+# Show detailed daily breakdown
+aws-billing-info --detailed
+
+# Custom days with details
+aws-billing-info --days 14 --detailed
+aws-billing-info -d 30 --detailed
 ```
 
 ## Output
+
+### Default (total only)
+
+```
+Fetching AWS billing data for last 7 days...
+
+Total: $3.06
+```
+
+### Detailed (`--detailed`)
 
 ```
 Fetching AWS billing data for last 7 days...

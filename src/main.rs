@@ -13,6 +13,9 @@ struct Args {
     /// Number of days to look back (default: 7)
     #[arg(short = 'd', long = "days", default_value = "7")]
     days: u32,
+    /// Show detailed daily breakdown (default: show only total)
+    #[arg(long = "detailed")]
+    detailed: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +26,7 @@ struct DailyCost {
 
 #[derive(Debug, Clone)]
 struct BillingData {
+    total: f64,
     days: Vec<DailyCost>,
 }
 
@@ -175,6 +179,7 @@ fn fetch_billing(days: u32) -> Result<BillingData, Error> {
     }
 
     let mut days = Vec::new();
+    let mut total = 0.0;
 
     for (date_str, services) in days_map {
         let date_obj =
@@ -185,13 +190,20 @@ fn fetch_billing(days: u32) -> Result<BillingData, Error> {
             date_obj.format("%B"),
             date_obj.year()
         );
+        let day_total: f64 = services.iter().map(|(_, amt)| *amt).sum();
+        total += day_total;
         days.push(DailyCost {
             formatted_date,
             services,
         });
     }
 
-    Ok(BillingData { days })
+    Ok(BillingData { total, days })
+}
+
+fn print_total(data: &BillingData, thresholds: Thresholds) {
+    let color = color_for_amount(data.total, thresholds.total_green, thresholds.total_orange);
+    println!("Total: {}{:.2}\x1b[0m", color, data.total);
 }
 
 fn print_billing(data: &BillingData, thresholds: Thresholds) {
@@ -225,7 +237,11 @@ fn main() {
                 std::process::exit(1);
             }
             println!();
-            print_billing(&data, thresholds);
+            if args.detailed {
+                print_billing(&data, thresholds);
+            } else {
+                print_total(&data, thresholds);
+            }
         }
         Err(e) => {
             eprintln!("Failed to fetch billing data: {}", e);
