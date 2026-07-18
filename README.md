@@ -4,8 +4,32 @@ A minimal CLI tool that fetches and displays AWS billing data for the last N day
 
 ## Prerequisites
 
-- [AWS CLI](https://aws.amazon.com/cli/) installed and configured
-- AWS Cost Explorer permissions enabled (`aws ce get-cost-and-usage`)
+1. **AWS CLI** — install and configure it:
+   ```bash
+   # macOS
+   brew install awscli && aws configure
+
+   # Linux
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+   unzip awscliv2.zip && sudo ./aws/install && aws configure
+   ```
+   See [official docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for other platforms.
+
+2. **AWS Cost Explorer** — enable it in the [AWS Console](https://console.aws.amazon.com/cost-management/home#/ce) if you haven't already. It may take 24 hours after first enabling to show data.
+
+3. **IAM permissions** — your AWS user/role needs `ce:GetCostAndUsage` (and optionally `ce:GetDimensionValues`). Example policy:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["ce:GetCostAndUsage", "ce:GetDimensionValues"],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
 
 ## Installation
 
