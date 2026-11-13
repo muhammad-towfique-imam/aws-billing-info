@@ -57,6 +57,28 @@ aws-billing-info --days 14 --detailed
 aws-billing-info -d 30 --detailed
 ```
 
+## Show a summary when a shell starts
+
+`--summary` prints one line for the last 7 days (or `--days N`). The daily totals come after the average, newest day first:
+
+```
+AWS billing (last 7 days): $6.32 total · avg $0.90/day · $0.10 $0.20 $0.13 $0.40 $0.23 $0.22 $0.11
+```
+
+Add this line to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+[[ $- == *i* ]] && command -v aws-billing-info >/dev/null && aws-billing-info --summary 2>/dev/null
+```
+
+For fish, add this to `~/.config/fish/config.fish`:
+
+```fish
+status is-interactive; and type -q aws-billing-info; and aws-billing-info --summary 2>/dev/null
+```
+
+AWS charges $0.01 for each Cost Explorer API request. Thus `--summary` keeps the response in `~/.cache/aws-billing-info/` for 6 hours. A new shell reads the cache and starts with no delay. Only the first shell after the cache expires waits for the AWS call (approximately 2 seconds).
+
 ## Output
 
 ### Default (daily totals)

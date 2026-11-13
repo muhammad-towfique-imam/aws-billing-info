@@ -16,7 +16,13 @@ struct Args {
     /// Show detailed daily breakdown (default: show only total)
     #[arg(long = "detailed")]
     detailed: bool,
+    /// Print one summary line (for shell startup). Uses a cache to limit AWS API calls.
+    #[arg(long = "summary", conflicts_with = "detailed")]
+    summary: bool,
 }
+
+/// Cost Explorer charges $0.01 per API request, so summary mode reuses a cached response.
+const SUMMARY_CACHE_TTL_SECS: u64 = 6 * 60 * 60;
 
 #[derive(Debug, Clone)]
 struct DailyCost {
@@ -110,13 +116,16 @@ fn today_utc() -> chrono::NaiveDate {
     now.date_naive()
 }
 
-fn fetch_billing(days: u32) -> Result<BillingData, Error> {
+fn time_period(days: u32) -> (String, String) {
     let end = today_utc() + chrono::Duration::days(1);
     let start = end - chrono::Duration::days(days as i64);
+    (
+        start.format("%Y-%m-%d").to_string(),
+        end.format("%Y-%m-%d").to_string(),
+    )
+}
 
-    let start_str = start.format("%Y-%m-%d").to_string();
-    let end_str = end.format("%Y-%m-%d").to_string();
-
+fn fetch_raw(start_str: &str, end_str: &str) -> Result<String, Error> {
     let output = Command::new("aws")
         .args([
             "ce",
@@ -138,8 +147,59 @@ fn fetch_billing(days: u32) -> Result<BillingData, Error> {
         return Err(Error::AwsCli(stderr.into_owned()));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let v: Value = serde_json::from_str(&stdout)?;
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Return the AWS response from the cache if it is fresh. Otherwise fetch it and update the cache.
+fn fetch_raw_cached(start_str: &str, end_str: &str) -> Result<String, Error> {
+    let cache_path = dirs::cache_dir().map(|d| {
+        d.join("aws-billing-info")
+            .join(format!("ce-{}-{}.json", start_str, end_str))
+    });
+
+    if let Some(path) = &cache_path {
+        let fresh = std::fs::metadata(path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .map(|age| age.as_secs() < SUMMARY_CACHE_TTL_SECS)
+            .unwrap_or(false);
+        if fresh {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                return Ok(content);
+            }
+        }
+    }
+
+    let raw = fetch_raw(start_str, end_str)?;
+
+    if let Some(path) = &cache_path {
+        if let Some(dir) = path.parent() {
+            if std::fs::create_dir_all(dir).is_ok() {
+                // Remove old cache files for other time periods.
+                if let Ok(entries) = std::fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        if entry.path() != *path {
+                            let _ = std::fs::remove_file(entry.path());
+                        }
+                    }
+                }
+                let _ = std::fs::write(path, &raw);
+            }
+        }
+    }
+
+    Ok(raw)
+}
+
+fn fetch_billing(days: u32, use_cache: bool) -> Result<BillingData, Error> {
+    let (start_str, end_str) = time_period(days);
+    let raw = if use_cache {
+        fetch_raw_cached(&start_str, &end_str)?
+    } else {
+        fetch_raw(&start_str, &end_str)?
+    };
+    let v: Value = serde_json::from_str(&raw)?;
 
     let mut days_map: std::collections::BTreeMap<String, Vec<(String, f64)>> =
         std::collections::BTreeMap::new();
@@ -228,12 +288,52 @@ fn print_billing(data: &BillingData, thresholds: Thresholds) {
     }
 }
 
+fn print_summary(data: &BillingData, days: u32, thresholds: Thresholds) {
+    let totals: Vec<f64> = data
+        .days
+        .iter()
+        .map(|d| d.services.iter().map(|(_, amt)| *amt).sum())
+        .collect();
+    let total: f64 = totals.iter().sum();
+    let avg = total / days.max(1) as f64;
+    let avg_color = color_for_amount(avg, thresholds.total_green, thresholds.total_orange);
+    // Newest day first, so today's partial amount comes first.
+    let daily: Vec<String> = totals
+        .iter()
+        .rev()
+        .map(|t| {
+            let color = color_for_amount(*t, thresholds.total_green, thresholds.total_orange);
+            format!("{}${:.2}\x1b[0m", color, t)
+        })
+        .collect();
+    println!(
+        "\x1b[1;36mAWS billing (last {} days):\x1b[0m {}${:.2}\x1b[0m total · avg {}${:.2}\x1b[0m/day · {}",
+        days,
+        avg_color,
+        total,
+        avg_color,
+        avg,
+        daily.join(" ")
+    );
+}
+
 fn main() {
     let args = Args::parse();
     let thresholds = load_thresholds();
 
+    if args.summary {
+        match fetch_billing(args.days, true) {
+            Ok(data) => print_summary(&data, args.days, thresholds),
+            Err(e) => {
+                eprintln!("aws-billing-info: {}", e.to_string().trim());
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     println!("Fetching AWS billing data for last {} days...", args.days);
-    match fetch_billing(args.days) {
+    match fetch_billing(args.days, false) {
         Ok(data) => {
             if data.days.is_empty() {
                 eprintln!("No billing data returned. Check your AWS config and Cost Explorer permissions.");
