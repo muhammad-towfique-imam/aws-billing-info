@@ -117,6 +117,75 @@ add_to_path() {
   esac
 }
 
+# The uninstaller finds the startup line by this marker. Keep it the same in uninstall.sh.
+SUMMARY_MARKER="# aws-billing-info shell summary"
+
+# Print the rc file of the user's login shell. Print nothing if the shell is not supported.
+shell_rc_file() {
+  platform=$1
+  case "$(basename "${SHELL:-}")" in
+    bash)
+      # On macOS, Terminal starts login shells, which read ~/.bash_profile and not ~/.bashrc.
+      if [ "$platform" = "macos" ]; then
+        echo "$HOME/.bash_profile"
+      else
+        echo "$HOME/.bashrc"
+      fi
+      ;;
+    zsh)  echo "${ZDOTDIR:-$HOME}/.zshrc" ;;
+    fish) echo "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish" ;;
+  esac
+}
+
+# Ask the user to show a billing summary when a shell starts.
+# Set AWS_BILLING_SUMMARY=yes or AWS_BILLING_SUMMARY=no to skip the question.
+setup_shell_summary() {
+  platform=$1
+  rc_file=$(shell_rc_file "$platform")
+
+  if [ -z "$rc_file" ]; then
+    echo "" >&2
+    echo "Shell summary: shell '${SHELL:-unknown}' is not supported. See the README to set it up." >&2
+    return 0
+  fi
+
+  if [ -f "$rc_file" ] && grep -qF "$SUMMARY_MARKER" "$rc_file"; then
+    echo "Shell summary: already set up in $rc_file" >&2
+    return 0
+  fi
+
+  answer="${AWS_BILLING_SUMMARY:-}"
+  if [ -z "$answer" ]; then
+    echo "" >&2
+    echo "A billing summary at shell startup calls AWS Cost Explorer (\$0.01 per call, cached for 6 hours)." >&2
+    printf "Show the AWS billing summary when a shell starts? Adds 1 line to %s [y/N] " "$rc_file" >&2
+    # The script can run from 'curl | sh', so stdin is the script. Read the answer from the terminal.
+    { read -r answer < /dev/tty; } 2>/dev/null || answer=""
+  fi
+
+  case "$answer" in
+    y|Y|yes|YES|Yes) ;;
+    *)
+      echo "Shell summary: skipped. See the README to set it up later." >&2
+      return 0
+      ;;
+  esac
+
+  bin="$INSTALL_DIR/$BIN_NAME"
+  case "$rc_file" in
+    *.fish)
+      line="status is-interactive; and test -x \"$bin\"; and \"$bin\" --summary 2>/dev/null $SUMMARY_MARKER"
+      ;;
+    *)
+      line="[[ \$- == *i* ]] && [ -x \"$bin\" ] && \"$bin\" --summary 2>/dev/null $SUMMARY_MARKER"
+      ;;
+  esac
+
+  mkdir -p "$(dirname "$rc_file")"
+  printf '\n%s\n' "$line" >> "$rc_file"
+  echo "Shell summary: added to $rc_file. It shows in new shells." >&2
+}
+
 main() {
   read -r platform arch <<EOF
 $(detect_platform)
@@ -128,6 +197,7 @@ EOF
   binary_path=$(download_binary "$platform" "$arch")
   install_binary "$binary_path"
   add_to_path
+  setup_shell_summary "$platform"
 
   echo "" >&2
   echo "Run '$BIN_NAME --help' to get started." >&2

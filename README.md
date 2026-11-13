@@ -37,11 +37,19 @@ A minimal CLI tool that fetches and displays AWS billing data for the last N day
 curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-info/main/install.sh | sh
 ```
 
+The installer asks if it must show the billing summary when a shell starts (see [Show a summary when a shell starts](#show-a-summary-when-a-shell-starts)). To answer without the question, set `AWS_BILLING_SUMMARY`:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-info/main/install.sh | AWS_BILLING_SUMMARY=yes sh
+```
+
 ## Uninstall
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/muhammad-towfique-imam/aws-billing-info/main/uninstall.sh | sh
 ```
+
+The uninstaller removes the binary, the shell summary line from your shell rc files, and the summary cache. It does not change your `PATH` line.
 
 ## Usage
 
@@ -65,7 +73,9 @@ aws-billing-info -d 30 --detailed
 AWS billing (last 7 days): $6.32 total · avg $0.90/day · $0.10 $0.20 $0.13 $0.40 $0.23 $0.22 $0.11
 ```
 
-Add this line to `~/.bashrc` or `~/.zshrc`:
+If you answer `y` to the installer question, the installer adds the line for your shell. It adds the line to `~/.bashrc` (`~/.bash_profile` on macOS), `~/.zshrc`, or `~/.config/fish/config.fish`.
+
+To add the line yourself, add this line to `~/.bashrc` or `~/.zshrc`:
 
 ```bash
 [[ $- == *i* ]] && command -v aws-billing-info >/dev/null && aws-billing-info --summary 2>/dev/null
